@@ -20,9 +20,8 @@ Namespace Services
             _azureConfig.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3)
         End Sub
 
-        Public Async Function SynthesizeAsync(text As String) As Task(Of String) ' RETURN FILE PATH
+        Public Async Function SynthesizeAsync(text As String) As Task
             Dim stream = AudioOutputStream.CreatePullStream
-            Dim rawAudio = New Byte() {}
 
             _azureConfig.SpeechSynthesisVoiceName = _voices(_random.Next(0, _voices.Count))
 
@@ -31,15 +30,18 @@ Namespace Services
                     Dim result = Await synthesizer.SpeakTextAsync(text).ConfigureAwait(False)
 
                     If result.Reason = ResultReason.SynthesizingAudioCompleted Then
-                        rawAudio = result.AudioData
-                        Log.Information($"Azure speech synthesis successfully completed. Text: {text}")
+                        Log.Verbose("Azure speech synthesis successfully completed.")
+                        Log.Verbose($"Text used: {text}")
                     Else
-                        Log.Warning($"Azure speech synthesis completed with non-success reason: {result.Reason}. Text: {text}")
+                        Log.Warning($"Azure speech synthesis completed with non-success reason: {result.Reason}")
+                        If result.Reason = ResultReason.Canceled Then
+                            Dim reason = SpeechSynthesisCancellationDetails.FromResult(result)
+                            Log.Warning(reason.ErrorDetails)
+                        End If
+                        Log.Warning($"Text used: {text}")
                     End If
                 End Using
             End Using
-
-
         End Function
     End Class
 End Namespace
