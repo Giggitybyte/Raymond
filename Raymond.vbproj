@@ -23,20 +23,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Discord.Net" Version="2.2.0-dev-20191130.5" />
-    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.8.0" />
+    <PackageReference Include="DSharpPlus" Version="4.0.0-nightly-00658" />
+    <PackageReference Include="DSharpPlus.VoiceNext" Version="4.0.0-nightly-00658" />
+    <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="2.0.0-beta01" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.2" />
     <PackageReference Include="Serilog" Version="2.9.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="4.0.0-dev-00834" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="config.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="libsodium.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="opus.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="sodium.dll">
