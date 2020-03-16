@@ -64,14 +64,13 @@ Namespace Services
             Await SendPhraseAsync(channels.First)
 
             ' Set timer to fire again anywhere between 2 and 5 days.
-            ' Dim time = TimeSpan.FromMilliseconds(_numbers.RandomNumber(172800000, 432000000))
-            Dim time = TimeSpan.FromMilliseconds(_numbers.RandomNumber(5000, 10000))
+            Dim time = TimeSpan.FromMilliseconds(_numbers.RandomNumber(172800000, 432000000))
             _timers(guild.Id).Change(time, Timeout.InfiniteTimeSpan)
 
             Await _logger.PrintAsync(LogLevel.Info, "Phrase Service", $"Next appearance for {guild.Id}: {time.Days} days, {time.Hours} hours, {time.Minutes} minutes, {time.Seconds} seconds.")
         End Sub
 
-        Public Async Function SendPhraseAsync(channel As DiscordChannel) As Task
+        Private Async Function SendPhraseAsync(channel As DiscordChannel) As Task
             ' Generate phrase.
             Dim dbl = _numbers.RandomDouble
             Dim generator = _generators.Where(Function(g) _numbers.ProbabilityCheck(g.Chance)).First
@@ -80,7 +79,12 @@ Namespace Services
             Dim phrase = generator.GeneratePhrase(_numbers)
 
             ' Send phrase to provided voice channel.
-            Dim speech = Await _tts.SynthesizeAsync(phrase)
+            Await SendPhraseAsync(phrase, channel)
+        End Function
+
+        Public Async Function SendPhraseAsync(text As String, channel As DiscordChannel) As Task
+            ' Send phrase to provided voice channel.
+            Dim speech = Await _tts.SynthesizeAsync(text)
             Dim voiceChn = Await channel.ConnectAsync()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Sending phrase to {channel.Id}.")
