@@ -1,10 +1,14 @@
 Imports System.IO
 Imports System.Text
 Imports DSharpPlus
+Imports DSharpPlus.CommandsNext
 Imports DSharpPlus.Entities
 Imports DSharpPlus.VoiceNext
+Imports LiteDB
 Imports Microsoft.Extensions.DependencyInjection
 Imports Newtonsoft.Json
+Imports Raymond.Commands
+Imports Raymond.Database
 Imports Raymond.Services
 
 Module Program
@@ -14,7 +18,7 @@ Module Program
         MainAsync().GetAwaiter().GetResult()
     End Sub
 
-    Public Async Function MainAsync() As Task
+    Private Async Function MainAsync() As Task
         Dim config = GetRaymondConfig()
         Dim logger As New LogService
 
@@ -30,18 +34,29 @@ Module Program
         AddHandler discord.ClientErrored, Function(e) logger.PrintAsync(LogLevel.Error, e.EventName, "", e.Exception)
         AddHandler discord.DebugLogger.LogMessageReceived, Function(s, e) logger.PrintAsync(e.Level, e.Application, e.Message, e.Exception)
 
+        Dim db As New LiteDatabase("Raymond.db")
+        db.GetCollection(Of GuildBlacklist).EnsureIndex(Function(b) b.GuildId)
+
         With New ServiceCollection
-            .AddSingleton(config)
+            .AddSingleton(db)
             .AddSingleton(discord)
             .AddSingleton(logger)
+            .AddSingleton(Of NumberService)
             .AddSingleton(Of GoogleTtsService)
-            .AddSingleton(Of MutteringService)
+            .AddSingleton(Of PhraseService)
             _services = .BuildServiceProvider
         End With
 
-        _services.GetRequiredService(Of MutteringService)
+        _services.GetRequiredService(Of PhraseService)
 
-        Await discord.ConnectAsync(status:=UserStatus.Invisible)
+        Dim cmds = discord.UseCommandsNext(New CommandsNextConfiguration With {
+            .IgnoreExtraArguments = True,
+            .Services = _services
+        })
+
+        cmds.SetHelpFormatter(Of HelpFormatter)()
+
+        Await discord.ConnectAsync(status:=UserStatus.DoNotDisturb)
         Await Task.Delay(-1)
     End Function
 
