@@ -25,7 +25,7 @@ Namespace Generators
 
         Public ReadOnly Property Chance As Double Implements IPhraseGenerator.Chance
             Get
-                Return 0.9
+                Return 0.8
             End Get
         End Property
 

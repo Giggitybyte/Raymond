@@ -27,7 +27,7 @@ Module Raymond
 
         Dim discord As New DiscordClient(New DiscordConfiguration With {
             .LogLevel = LogLevel.Debug,
-            .Token = config("token.discord"),
+            .Token = config("token.discord.pub"),
             .TokenType = TokenType.Bot
         })
 

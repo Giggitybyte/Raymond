@@ -11,7 +11,7 @@ Namespace Services
     Public Class PhraseService
         Private _database As LiteDatabase
         Private _discord As DiscordClient
-        Private _generators As List(Of IPhraseGenerator)
+        Private _generators As WeightedGeneratorBag
         Private _logger As LogService
         Private _numbers As NumberService
         Private _timers As Dictionary(Of ULong, Timer)
@@ -20,11 +20,13 @@ Namespace Services
         Public Sub New(db As LiteDatabase, discord As DiscordClient, tts As GoogleTtsService, numbers As NumberService, logger As LogService)
             _database = db
             _discord = discord
-            _generators = GetGenerators()
             _logger = logger
             _timers = New Dictionary(Of ULong, Timer)
             _tts = tts
             _numbers = numbers
+
+            _generators = New WeightedGeneratorBag
+            InitializeGenerators()
 
             AddHandler _discord.GuildAvailable, AddressOf GuildAvailableHandler
         End Sub
@@ -73,8 +75,7 @@ Namespace Services
 
         Private Async Function SendPhraseAsync(channel As DiscordChannel) As Task
             ' Generator selection.
-            Dim probability = _numbers.RandomDouble
-            Dim generator = _generators.Aggregate(Function(x, y) If((x.Chance - probability) < (y.Chance - probability), x, y))
+            Dim generator = _generators.GetGenerator(_numbers)
 
             ' Generate phrase.
             Await _logger.PrintAsync(LogLevel.Info, "Phrase Service", $"{generator.GetType.Name} will be generating a phrase.")
@@ -130,13 +131,15 @@ Namespace Services
             Return blacklist.ChannelIds.AsReadOnly
         End Function
 
-        Protected Function GetGenerators() As List(Of IPhraseGenerator)
+        Protected Sub InitializeGenerators()
             Dim interfaceType = GetType(IPhraseGenerator)
             Dim types = interfaceType.Assembly.GetTypes.Where(Function(t) t IsNot interfaceType AndAlso
-                                                                          interfaceType.IsAssignableFrom(t))
+                                                                  interfaceType.IsAssignableFrom(t)).ToList
 
-            Return types.Select(Function(t) CType(Activator.CreateInstance(t), IPhraseGenerator)).ToList
-        End Function
+            Dim instances As New List(Of IPhraseGenerator)
+            types.ForEach(Sub(t) instances.Add(CType(Activator.CreateInstance(t), IPhraseGenerator)))
+            instances.OrderBy(Function(i) i.Chance).ToList.ForEach(Sub(i) _generators.AddEntry(i))
+        End Sub
 
         Protected Function CreateFfmpeg() As Process
             Return Process.Start(New ProcessStartInfo With {
@@ -147,5 +150,35 @@ Namespace Services
                 .RedirectStandardInput = True
             })
         End Function
+
+        Protected Class WeightedGeneratorBag ' https://gamedev.stackexchange.com/a/162987
+            Private _entries As New List(Of Entry)
+            Private _accumulatedWeight As Double
+
+            Public Sub AddEntry(item As IPhraseGenerator)
+                _accumulatedWeight += item.Chance
+                _entries.Add(New Entry With {
+                    .Generator = item,
+                    .AccumulatedWeight = _accumulatedWeight
+                })
+            End Sub
+
+            Public Function GetGenerator(numberService As NumberService) As IPhraseGenerator
+                Dim r As Double = numberService.RandomDouble * _accumulatedWeight
+
+                For Each entry As Entry In _entries
+                    If entry.AccumulatedWeight >= r Then
+                        Return entry.Generator
+                    End If
+                Next
+
+                Return Nothing
+            End Function
+
+            Private Structure Entry
+                Public Property AccumulatedWeight As Double
+                Public Property Generator As IPhraseGenerator
+            End Structure
+        End Class
     End Class
 End Namespace
