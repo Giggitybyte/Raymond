@@ -14,7 +14,7 @@ Imports Raymond.Commands
 Imports Raymond.Database
 Imports Raymond.Services
 
-Module Program
+Module Raymond
     Private _services As IServiceProvider
 
     Public Sub Main(args As String())
