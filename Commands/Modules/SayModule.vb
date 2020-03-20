@@ -1,6 +1,5 @@
 ﻿Imports DSharpPlus.CommandsNext
 Imports DSharpPlus.CommandsNext.Attributes
-Imports DSharpPlus.Entities
 Imports Raymond.Services
 
 Namespace Commands.Modules

@@ -20,7 +20,7 @@ Namespace Services
         Public Sub New(db As LiteDatabase, discord As DiscordClient, tts As GoogleTtsService, numbers As NumberService, logger As LogService)
             _database = db
             _discord = discord
-            _generators = GetGenerators().OrderBy(Function(g) g.Chance).ToList
+            _generators = GetGenerators()
             _logger = logger
             _timers = New Dictionary(Of ULong, Timer)
             _tts = tts
@@ -29,9 +29,11 @@ Namespace Services
             AddHandler _discord.GuildAvailable, AddressOf GuildAvailableHandler
         End Sub
 
-        Private Function GuildAvailableHandler(e As GuildCreateEventArgs) As Task
-            If Not _timers.ContainsKey(e.Guild.Id) Then _timers.Add(e.Guild.Id, New Timer(AddressOf PhraseTrigger, e.Guild.Id, 5000, -1))
-            Return Task.CompletedTask
+        Private Async Function GuildAvailableHandler(e As GuildCreateEventArgs) As Task
+            If _timers.ContainsKey(e.Guild.Id) Then Return
+
+            _timers.Add(e.Guild.Id, New Timer(AddressOf PhraseTrigger, e.Guild.Id, 5000, -1))
+            Await _logger.PrintAsync(LogLevel.Info, "Phrase Service", $"Added a new timer for {e.Guild.Id}")
         End Function
 
         Private Async Sub PhraseTrigger(state As Object)
@@ -46,7 +48,7 @@ Namespace Services
                 Return
             End If
 
-            ' Pick a random populated, non-blacklisted voice channel.
+            ' Pick the most populated, non-blacklisted voice channel.
             Dim blacklist = GetChannelBlacklist(guild.Id)
             Dim channels = (Await guild.GetChannelsAsync()).Where(Function(c) Not blacklist.Contains(c.Id)) _
                                                            .Where(Function(c) c.Type = ChannelType.Voice AndAlso c.Users.Any) _
@@ -55,13 +57,12 @@ Namespace Services
 
             If guild.AfkChannel IsNot Nothing AndAlso channels.Contains(guild.AfkChannel) Then channels.Remove(guild.AfkChannel)
 
-            If Not channels.Any Then
+            ' Send phrase if there are any valid channels.
+            If channels.Any Then
+                Await SendPhraseAsync(channels.First)
+            Else
                 Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"No valid channels could be found for {guild.Id}; skipping.")
-                Return
             End If
-
-            ' I bet you can't guess what happens next...
-            Await SendPhraseAsync(channels.First)
 
             ' Set timer to fire again anywhere between 2 and 5 days.
             Dim time = TimeSpan.FromMilliseconds(_numbers.RandomNumber(172800000, 432000000))
@@ -71,10 +72,11 @@ Namespace Services
         End Sub
 
         Private Async Function SendPhraseAsync(channel As DiscordChannel) As Task
-            ' Generate phrase.
-            Dim dbl = _numbers.RandomDouble
-            Dim generator = _generators.Where(Function(g) _numbers.ProbabilityCheck(g.Chance)).First
+            ' Generator selection.
+            Dim probability = _numbers.RandomDouble
+            Dim generator = _generators.Aggregate(Function(x, y) If((x.Chance - probability) < (y.Chance - probability), x, y))
 
+            ' Generate phrase.
             Await _logger.PrintAsync(LogLevel.Info, "Phrase Service", $"{generator.GetType.Name} will be generating a phrase.")
             Dim phrase = generator.GeneratePhrase(_numbers)
 
@@ -109,7 +111,7 @@ Namespace Services
             Await transmit.DisposeAsync
             voiceChn.Disconnect()
 
-            Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Phrase playback completed in {channel.Id}")
+            Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Phrase playback completed in {channel.Id}.")
         End Function
 
         Protected Function GetChannelBlacklist(guildId As ULong) As IReadOnlyList(Of ULong)
@@ -130,14 +132,10 @@ Namespace Services
 
         Protected Function GetGenerators() As List(Of IPhraseGenerator)
             Dim interfaceType = GetType(IPhraseGenerator)
-            Dim types = interfaceType.Assembly.GetTypes.Where(Function(t) t IsNot interfaceType AndAlso interfaceType.IsAssignableFrom(t))
-            Dim generators As New List(Of IPhraseGenerator)
+            Dim types = interfaceType.Assembly.GetTypes.Where(Function(t) t IsNot interfaceType AndAlso
+                                                                          interfaceType.IsAssignableFrom(t))
 
-            For Each generatorType In types
-                generators.Add(CType(Activator.CreateInstance(generatorType), IPhraseGenerator))
-            Next
-
-            Return generators
+            Return types.Select(Function(t) CType(Activator.CreateInstance(t), IPhraseGenerator)).ToList
         End Function
 
         Protected Function CreateFfmpeg() As Process

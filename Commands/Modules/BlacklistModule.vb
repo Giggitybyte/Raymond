@@ -30,7 +30,13 @@ Namespace Commands.Modules
             End If
 
             If blacklist.ChannelIds.Contains(channel.Id) Then
-                Await ctx.Message.CreateReactionAsync(DiscordEmoji.FromName(ctx.Client, ":x:"))
+                Await ctx.RespondAsync("That channel is already on the blacklist.")
+                Return
+            End If
+
+            If Not channel.Type = ChannelType.Voice Then
+                Await ctx.RespondAsync($"That channel is a {channel.Type.ToString.ToLower} channel.{vbCrLf}Only voice channels can be blacklisted.")
+                Return
             End If
 
             blacklist.ChannelIds.Add(channel.Id)
@@ -56,7 +62,8 @@ Namespace Commands.Modules
             End If
 
             If Not blacklist.ChannelIds.Contains(channel.Id) Then
-                Await ctx.Message.CreateReactionAsync(DiscordEmoji.FromName(ctx.Client, ":x:"))
+                Await ctx.RespondAsync("That channel is not on the blacklist.")
+                Return
             End If
 
             blacklist.ChannelIds.Remove(channel.Id)
