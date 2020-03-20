@@ -23,6 +23,12 @@ Namespace Generators
             End Get
         End Property
 
+        Public ReadOnly Property TtsVoice As String Implements IPhraseGenerator.TtsVoice
+            Get
+                Return "en-GB-Wavenet-D"
+            End Get
+        End Property
+
         Public Function GeneratePhrase(numberGenerator As NumberService) As String Implements IPhraseGenerator.GeneratePhrase
             Return _sentences(numberGenerator.RandomNumber(_sentences.Count))
         End Function

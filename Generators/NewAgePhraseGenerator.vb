@@ -33,6 +33,12 @@ Namespace Generators
             End Get
         End Property
 
+        Public ReadOnly Property TtsVoice As String Implements IPhraseGenerator.TtsVoice
+            Get
+                Return "en-US-Wavenet-A"
+            End Get
+        End Property
+
         Public Function GeneratePhrase(numberGenerator As NumberService) As String Implements IPhraseGenerator.GeneratePhrase
             If numberGenerator.ProbabilityCheck(0.3) Then
                 Dim firstHalf = _beginningHalves(numberGenerator.RandomNumber(_beginningHalves.Count))

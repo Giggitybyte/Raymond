@@ -6,22 +6,32 @@ Namespace Services
     Public Class GoogleTtsService
         Private _client As TextToSpeechClient
         Private _logger As LogService
+        Private _validVoices As List(Of String)
 
         Public Sub New(logger As LogService)
             _client = TextToSpeechClient.Create()
             _logger = logger
+
+            Dim req As New ListVoicesRequest With {.LanguageCode = "en-US"}
+            _validVoices = _client.ListVoices(req).Voices _
+                                  .Where(Function(v) v.SsmlGender = SsmlVoiceGender.Male) _
+                                  .Select(Function(v) v.Name) _
+                                  .ToList
         End Sub
 
-        Public Async Function SynthesizeAsync(phrase As String) As Task(Of ByteString)
-            Await _logger.PrintAsync(LogLevel.Info, "Google TTS", $"Synthsizing phrase: {phrase}")
+        Public Async Function SynthesizeAsync(phrase As String, Optional voice As String = Nothing) As Task(Of ByteString)
+            If voice Is Nothing Then voice = "en-US-Wavenet-D"
+            If Not _validVoices.Contains(voice) Then Throw New ArgumentException("Invalid TTS voice.")
+            Await _logger.PrintAsync(LogLevel.Info, "Google TTS", $"Synthesizing phrase: {phrase}")
 
             Dim config As New AudioConfig With {
                 .AudioEncoding = AudioEncoding.Mp3
             }
 
-            Dim voice As New VoiceSelectionParams With {
+            Dim voiceParams As New VoiceSelectionParams With {
                 .LanguageCode = "en-US",
-                .SsmlGender = SsmlVoiceGender.Male
+                .SsmlGender = SsmlVoiceGender.Male,
+                .Name = voice
             }
 
             Dim input As New SynthesisInput With {
@@ -31,7 +41,7 @@ Namespace Services
             Dim response = Await _client.SynthesizeSpeechAsync(New SynthesizeSpeechRequest With {
                 .AudioConfig = config,
                 .Input = input,
-                .Voice = voice
+                .Voice = voiceParams
             })
 
             Return response.AudioContent

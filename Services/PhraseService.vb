@@ -82,18 +82,16 @@ Namespace Services
             Dim phrase = generator.GeneratePhrase(_numbers)
 
             ' Send phrase to provided voice channel.
-            Await SendPhraseAsync(phrase, channel)
+            Await SendPhraseAsync(phrase, channel, generator.TtsVoice)
         End Function
 
-        Public Async Function SendPhraseAsync(text As String, channel As DiscordChannel) As Task
+        Public Async Function SendPhraseAsync(text As String, channel As DiscordChannel, voice As String) As Task
             ' Send phrase to provided voice channel.
-            Dim speech = Await _tts.SynthesizeAsync(text)
+            Dim speech = Await _tts.SynthesizeAsync(text, voice)
             Dim voiceChn = Await channel.ConnectAsync()
+            Dim transmit = voiceChn.GetTransmitStream()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Sending phrase to {channel.Id}.")
-            Await voiceChn.SendSpeakingAsync()
-
-            Dim transmit = voiceChn.GetTransmitStream()
 
             Using ffmpeg = CreateFfmpeg()
                 Dim input = ffmpeg.StandardInput.BaseStream
@@ -108,7 +106,6 @@ Namespace Services
             Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Waiting for phrase to finish... ({channel.Id})")
             Await voiceChn.WaitForPlaybackFinishAsync
 
-            Await voiceChn.SendSpeakingAsync(False)
             Await transmit.DisposeAsync
             voiceChn.Disconnect()
 

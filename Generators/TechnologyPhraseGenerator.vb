@@ -29,6 +29,12 @@ Namespace Generators
             End Get
         End Property
 
+        Public ReadOnly Property TtsVoice As String Implements IPhraseGenerator.TtsVoice
+            Get
+                Return "en-IN-Wavenet-C"
+            End Get
+        End Property
+
         Public Function GeneratePhrase(numberGenerator As NumberService) As String Implements IPhraseGenerator.GeneratePhrase
             Dim verb = _verbs(numberGenerator.RandomNumber(_verbs.Count))
             Dim adjective = _adjectives(numberGenerator.RandomNumber(_adjectives.Count))
