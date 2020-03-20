@@ -341,3 +341,5 @@ healthchecksdb
 
 # Project Specific
 config.json
+opus.dll
+sodium.dll
