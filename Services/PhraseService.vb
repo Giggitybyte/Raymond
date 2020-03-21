@@ -34,11 +34,11 @@ Namespace Services
         Private Async Function GuildAvailableHandler(e As GuildCreateEventArgs) As Task
             If _timers.ContainsKey(e.Guild.Id) Then Return
 
-            _timers.Add(e.Guild.Id, New Timer(AddressOf PhraseTrigger, e.Guild.Id, 5000, -1))
+            _timers.Add(e.Guild.Id, New Timer(AddressOf GuildTrigger, e.Guild.Id, 5000, -1))
             Await _logger.PrintAsync(LogLevel.Info, "Phrase Service", $"Added a new timer for {e.Guild.Id}")
         End Function
 
-        Private Async Sub PhraseTrigger(state As Object)
+        Private Async Sub GuildTrigger(state As Object)
             ' Get guild.
             Dim guild As DiscordGuild = Nothing
             _discord.Guilds.TryGetValue(CType(state, ULong), guild)
@@ -51,9 +51,10 @@ Namespace Services
             End If
 
             ' Pick the most populated, non-blacklisted voice channel.
-            Dim blacklist = GetChannelBlacklist(guild.Id)
-            Dim channels = (Await guild.GetChannelsAsync()).Where(Function(c) Not blacklist.Contains(c.Id)) _
-                                                           .Where(Function(c) c.Type = ChannelType.Voice AndAlso c.Users.Any) _
+            Dim blacklist = GetVoiceChannelBlacklist(guild.Id)
+            Dim channels = (Await guild.GetChannelsAsync()).Where(Function(c) c.Type = ChannelType.Voice _
+                                                                              AndAlso Not blacklist.Contains(c.Id) _
+                                                                              AndAlso c.Users.Any) _
                                                            .OrderByDescending(Function(c) c.Users.Count) _
                                                            .ToList
 
@@ -112,20 +113,19 @@ Namespace Services
             Await _logger.PrintAsync(LogLevel.Debug, "Phrase Service", $"Phrase playback completed in {channel.Id}.")
         End Function
 
-        Protected Function GetChannelBlacklist(guildId As ULong) As IReadOnlyList(Of ULong)
-            Dim collection = _database.GetCollection(Of GuildBlacklist)("blacklists")
-            Dim blacklist = collection.FindOne(Function(g) g.GuildId = guildId)
+        Protected Function GetVoiceChannelBlacklist(guildId As ULong) As IReadOnlyList(Of ULong)
+            Dim collection = _database.GetCollection(Of GuildData)("blacklists")
+            Dim guild = collection.FindOne(Function(g) g.GuildId = guildId)
 
-            If blacklist Is Nothing Then
-                blacklist = New GuildBlacklist With {
-                    .GuildId = guildId,
-                    .ChannelIds = New List(Of ULong)
+            If guild Is Nothing Then
+                guild = New GuildData With {
+                    .GuildId = guildId
                 }
 
-                collection.Insert(blacklist)
+                collection.Insert(guild)
             End If
 
-            Return blacklist.ChannelIds.AsReadOnly
+            Return guild.ProhibitedVoiceIds.AsReadOnly
         End Function
 
         Protected Sub InitializeGenerators()

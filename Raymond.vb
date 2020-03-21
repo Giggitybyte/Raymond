@@ -14,13 +14,22 @@ Imports Raymond.Commands
 Imports Raymond.Database
 Imports Raymond.Services
 
+''' <summary>
+''' Main class.
+''' </summary>
 Module Raymond
     Private _services As IServiceProvider
 
+    ''' <summary>
+    ''' Program entry point.
+    ''' </summary>
     Public Sub Main(args As String())
         MainAsync().GetAwaiter().GetResult()
     End Sub
 
+    ''' <summary>
+    ''' Bot entry point.
+    ''' </summary>
     Private Async Function MainAsync() As Task
         Dim config = GetRaymondConfig()
         Dim logger As New LogService
@@ -39,7 +48,7 @@ Module Raymond
 
         ' Services setup.
         Dim db As New LiteDatabase("Raymond.db")
-        db.GetCollection(Of GuildBlacklist).EnsureIndex(Function(b) b.GuildId)
+        db.GetCollection(Of GuildData)("guilds").EnsureIndex(Function(b) b.GuildId)
 
         With New ServiceCollection
             .AddSingleton(db)
@@ -61,6 +70,7 @@ Module Raymond
         })
 
         cmds.RegisterCommands(Assembly.GetExecutingAssembly)
+        cmds.RegisterConverter(New RaymondModeConverter)
         cmds.SetHelpFormatter(Of HelpFormatter)()
 
         AddHandler cmds.CommandErrored, AddressOf CommandErroredHandler
@@ -70,6 +80,9 @@ Module Raymond
         Await Task.Delay(-1)
     End Function
 
+    ''' <summary>
+    ''' Prints command errors to log, then informs the user that the command errored.
+    ''' </summary>
     Private Async Function CommandErroredHandler(e As CommandErrorEventArgs) As Task
         Dim msg = $"{e.Command.QualifiedName} errored in {e.Context.Guild.Id}"
         Await _services.GetRequiredService(Of LogService).PrintAsync(LogLevel.Error, "CNext", msg, e.Exception)
@@ -123,6 +136,9 @@ Module Raymond
         Await e.Context.RespondAsync(strBuilder.ToString)
     End Function
 
+    ''' <summary>
+    ''' Simply deserializes <i>config.json</i> to a Dictionary.
+    ''' </summary>
     Private Function GetRaymondConfig() As Dictionary(Of String, String)
         Dim cfg As Dictionary(Of String, String)
 
