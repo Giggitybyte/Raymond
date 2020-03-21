@@ -25,6 +25,7 @@ Module Raymond
         Dim config = GetRaymondConfig()
         Dim logger As New LogService
 
+        ' Client setup.
         Dim discord As New DiscordClient(New DiscordConfiguration With {
             .LogLevel = LogLevel.Debug,
             .Token = config("token.discord.pub"),
@@ -33,10 +34,10 @@ Module Raymond
 
         discord.UseVoiceNext()
 
-        AddHandler discord.Ready, Function(e) logger.PrintAsync(LogLevel.Info, "DSharpPlus", "Ready Fired.")
         AddHandler discord.ClientErrored, Function(e) logger.PrintAsync(LogLevel.Error, e.EventName, "", e.Exception)
         AddHandler discord.DebugLogger.LogMessageReceived, Function(s, e) logger.PrintAsync(e.Level, e.Application, e.Message, e.Exception)
 
+        ' Services setup.
         Dim db As New LiteDatabase("Raymond.db")
         db.GetCollection(Of GuildBlacklist).EnsureIndex(Function(b) b.GuildId)
 
@@ -52,7 +53,9 @@ Module Raymond
 
         _services.GetRequiredService(Of PhraseService)
 
+        ' Commands setup.
         Dim cmds = discord.UseCommandsNext(New CommandsNextConfiguration With {
+            .EnableDms = False,
             .IgnoreExtraArguments = True,
             .Services = _services
         })
@@ -62,6 +65,7 @@ Module Raymond
 
         AddHandler cmds.CommandErrored, AddressOf CommandErroredHandler
 
+        ' Bot start.
         Await discord.ConnectAsync(status:=UserStatus.DoNotDisturb)
         Await Task.Delay(-1)
     End Function
@@ -97,6 +101,22 @@ Module Raymond
             ElseIf TypeOf failedCheck Is RequireUserPermissionsAttribute Then
                 Dim check = DirectCast(failedCheck, RequireUserPermissionsAttribute)
                 strBuilder.AppendLine($"You're missing the following permissions:{vbCrLf}{check.Permissions.ToPermissionString}")
+
+            ElseIf TypeOf failedCheck Is CooldownAttribute Then
+                Dim cooldown = DirectCast(failedCheck, CooldownAttribute)
+
+                strBuilder.Append($"`{e.Command.QualifiedName}` is on cooldown ")
+                Select Case cooldown.BucketType
+                    Case CooldownBucketType.User
+                        strBuilder.Append("for you.")
+                    Case CooldownBucketType.Channel
+                        strBuilder.Append("in this channel.")
+                    Case CooldownBucketType.Guild
+                        strBuilder.Append("for this server.")
+                End Select
+
+                Dim remainingTime = cooldown.GetRemainingCooldown(e.Context)
+                strBuilder.AppendLine($"{vbCrLf}Time remaining: `{remainingTime.Minutes} minutes, {remainingTime.Seconds} seconds`.")
             End If
         Next
 

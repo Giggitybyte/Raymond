@@ -14,6 +14,7 @@ Namespace Commands.Modules
 
         <Command("say"), Aliases("speak", "echo")>
         <Description("Joins the voice channel you're currently in and says the specified text.")>
+        <Cooldown(10, 60, CooldownBucketType.Guild)>
         Public Async Function SayCommand(ctx As CommandContext, <RemainingText> text As String) As Task
             If ctx.Member?.VoiceState?.Channel Is Nothing Then Await ctx.RespondAsync("You must be in a voice channel to use this command.")
             Await _phrase.SendPhraseAsync(text, ctx.Member.VoiceState.Channel, Nothing)
