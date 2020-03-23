@@ -39,7 +39,7 @@ Namespace Generators.MarkovChain
         Public Function CreateSentence(guild As DiscordGuild) As GeneratorResult Implements IGenerator.CreateSentence
             Dim length = Random.NextNumber(15, 20)
             Return New GeneratorResult With {
-                .Sentence = _markovs(guild.Id).Generate(length),
+                .Sentence = _markovs(guild.Id).Generate(length) + ".",
                 .TtsVoice = "en-AU-Wavenet-B"
             }
         End Function
@@ -53,7 +53,8 @@ Namespace Generators.MarkovChain
             If File.Exists($"Markov/{e.Guild.Id}.pdo") Then
                 _markovs.Add(e.Guild.Id, New Markov($"Markov/{e.Guild.Id}.pdo"))
             Else
-                Task.Run(Function() CreateMarkovAsync(e.Guild))
+                ' Task.Run(Function() InitializeMarkov(e.Guild))
+                Return InitializeMarkov(e.Guild)
             End If
 
             Return Task.CompletedTask
@@ -64,28 +65,28 @@ Namespace Generators.MarkovChain
         ''' </summary>
         Private Function MessageCreatedHandler(e As MessageCreateEventArgs) As Task
             Dim data = _db.GetCollection(Of GuildData).GetGuildData(e.Guild.Id)
+            If Not (e.Message.Author.IsBot Or data.ProhibitedChannelIds.Contains(e.Channel.Id)) Then
+                _markovs(e.Guild.Id).AddToChain(_discordRegex.Replace(e.Message.Content, ""))
+            End If
 
-            If e.Message.Author.IsBot _
-               OrElse Not data.Generator = "markov" _
-               Or data.ProhibitedChannelIds.Contains(e.Channel.Id) _
-               Then Return Task.CompletedTask
-
-            _markovs(e.Guild.Id).AddToChain(_discordRegex.Replace(e.Message.Content, ""))
             Return Task.CompletedTask
         End Function
 
         ''' <summary>
         ''' Creates and trains a markov generator, then adds it to the dictionary.
         ''' </summary>
-        Private Async Function CreateMarkovAsync(guild As DiscordGuild) As Task
+        Private Async Function InitializeMarkov(guild As DiscordGuild) As Task
             Dim data = _db.GetCollection(Of GuildData).GetGuildData(guild.Id)
-            Dim channels = (Await guild.GetChannelsAsync).Where(Function(c) Not data.ProhibitedChannelIds.Contains(c.Id))
             Dim markov As New Markov($"Markov/{guild.Id}.pdo")
 
-            For Each channel In channels
-                Dim messages = (Await channel.GetMessagesAsync(300)).Where(Function(m) Not m.Author.IsBot)
+            Dim channels = Await guild.GetChannelsAsync
+            Dim textChannels = channels.Where(Function(c) c.Type = ChannelType.Text _
+                                                          AndAlso Not data.ProhibitedChannelIds.Contains(c.Id))
+            For Each channel In textChannels
+                Dim messages = Await channel.GetMessagesAsync(50)
+                Dim userMessages = messages.Where(Function(m) Not m.Author.IsBot)
 
-                For Each message In messages
+                For Each message In userMessages
                     Dim text = _discordRegex.Replace(message.Content, "")
                     text = String.Join(" ", _puncuationRegex.Matches(text))
                     markov.AddToChain(text)

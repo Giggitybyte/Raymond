@@ -1,4 +1,5 @@
-﻿Imports System.Threading
+﻿Imports System.IO
+Imports System.Threading
 Imports DSharpPlus
 Imports DSharpPlus.Entities
 Imports DSharpPlus.EventArgs
@@ -15,32 +16,37 @@ Namespace Services
     Public Class SentenceService
         Private _database As LiteDatabase
         Private _discord As DiscordClient
+        Private _generators As List(Of IGenerator)
         Private _logger As LogService
         Private _timers As Dictionary(Of ULong, Timer)
         Private _tts As GoogleTtsService
 
-        Public ReadOnly Property Generators As List(Of IGenerator)
-
         Public Sub New(db As LiteDatabase, discord As DiscordClient, tts As GoogleTtsService, logger As LogService, generators As IEnumerable(Of IGenerator))
             _database = db
             _discord = discord
-            _Generators = generators.ToList
+            _generators = generators.ToList
             _logger = logger
             _timers = New Dictionary(Of ULong, Timer)
             _tts = tts
 
             AddHandler _discord.GuildAvailable, AddressOf GuildAvailableHandler
-            AddHandler _discord.GuildUnavailable, AddressOf GuildUnavailableHandler
+            AddHandler _discord.GuildDeleted, AddressOf GuildRemovedHandler
         End Sub
 
+        ''' <summary>
+        ''' Sets up timers for guilds as they come available. These initial timers are set for 5 seconds.
+        ''' </summary>
         Private Async Function GuildAvailableHandler(e As GuildCreateEventArgs) As Task
             If _timers.ContainsKey(e.Guild.Id) Then Return
 
-            _timers.Add(e.Guild.Id, New Timer(AddressOf GuildTrigger, e.Guild.Id, 5000, -1))
-            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Added a new timer for {e.Guild.Id}")
+            _timers.Add(e.Guild.Id, New Timer(AddressOf GuildTrigger, e.Guild.Id, 5000, -1)) ' In prod, change to 2 days.
+            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Added a new timer for guild {e.Guild.Id}")
         End Function
 
-        Private Async Function GuildUnavailableHandler(e As GuildDeleteEventArgs) As Task
+        ''' <summary>
+        ''' Removes timers for guilds that have kicked us. Makes no sense in keeping those around.
+        ''' </summary>
+        Private Async Function GuildRemovedHandler(e As GuildDeleteEventArgs) As Task
             If _timers.ContainsKey(e.Guild.Id) Then
                 Dim timer As Timer
                 _timers.Remove(e.Guild.Id, timer)
@@ -48,17 +54,12 @@ Namespace Services
             End If
         End Function
 
-        Private Async Sub GuildTrigger(state As Object)
+        ''' <summary>
+        ''' The callback method for all timers. This triggers Raymond's appearances.
+        ''' </summary>
+        Private Async Sub GuildTrigger(guildId As Object)
             ' Get guild.
-            Dim guild As DiscordGuild = Nothing
-            _discord.Guilds.TryGetValue(CULng(state), guild)
-
-            If guild Is Nothing Then
-                Dim timer As Timer
-                _timers.Remove(CULng(state), timer)
-                Await timer.DisposeAsync()
-                Return
-            End If
+            Dim guild = _discord.Guilds(CULng(guildId))
 
             ' Send sentence to the most populated, non-blacklisted voice channel.
             Dim channels = (Await guild.GetChannelsAsync).ToList
@@ -69,37 +70,56 @@ Namespace Services
                                                            AndAlso Not blacklist.Contains(c.Id) _
                                                            AndAlso c.Users.Any).ToList
             If validChannels.Any Then
-                Await SendSentenceAsync(validChannels.OrderByDescending(Function(c) c.Users.Count).First)
+                Dim channel = validChannels.OrderByDescending(Function(c) c.Users.Count).First
+                Dim success As Boolean
+
+                Do ' vnext occasionally throws, so we'll retry until it doesn't fucking throw.
+                    success = Await SendSentenceAsync(channel)
+                Loop Until success
             Else
-                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Skipping {guild.Id}.")
+                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Skipping guild {guild.Id}.")
             End If
 
             ' Set timer to fire again anywhere between 2 and 5 days.
             Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(172800000, 432000000))
             _timers(guild.Id).Change(time, Timeout.InfiniteTimeSpan)
 
-            Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for {guild.Id}: {Date.Now.Add(time).ToString}")
+            Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for guild {guild.Id}: {Date.Now.Add(time).ToString}")
         End Sub
 
-        Private Async Function SendSentenceAsync(channel As DiscordChannel) As Task
+        ''' <summary>
+        ''' Selects a generator based on user preference then sends the guild a sentence.
+        ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
+        ''' </summary>
+        Private Async Function SendSentenceAsync(channel As DiscordChannel) As Task(Of Boolean)
             ' Get generator
-            Dim data = _database.GetCollection(Of GuildData).GetGuildData(channel.Guild.Id)
-            Dim generator = _Generators.FirstOrDefault(Function(g) g.Name = data.Generator)
-            If generator Is Nothing Then Throw New NotImplementedException($"Generator not implemented: {data.Generator}")
+            Dim collection = _database.GetCollection(Of GuildData)
+            Dim data = collection.GetGuildData(channel.Guild.Id)
+            Dim generator As IGenerator
+
+            If data.Generator = "random" Then
+                generator = _generators(Random.NextNumber(_generators.Count))
+            Else
+                generator = _generators.First(Function(g) g.Name = data.Generator)
+            End If
 
             ' Send sentence.
             Dim result = generator.CreateSentence(channel.Guild)
-            Await SendSentenceAsync(channel, result.Sentence, result.TtsVoice)
+            Return Await SendSentenceAsync(channel, result.Sentence, result.TtsVoice)
         End Function
 
-        Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task
+        ''' <summary>
+        ''' Joins the specified voice channel and says the provided text.
+        ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
+        ''' </summary>
+        Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task(Of Boolean)
             Dim speech = Await _tts.SynthesizeAsync(text, voice)
             Dim voiceChn As VoiceNextConnection
             Dim transmit As VoiceTransmitStream
 
-            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in channel {channel.Id}.")
-
             Using ffmpeg = CreateFfmpeg()
+                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Processing synthesized speech for {channel.Guild.Id}.")
+
                 Dim input = ffmpeg.StandardInput.BaseStream
                 speech.WriteTo(input)
                 Await input.DisposeAsync
@@ -107,9 +127,16 @@ Namespace Services
                 voiceChn = Await channel.ConnectAsync()
                 transmit = voiceChn.GetTransmitStream()
 
-                Dim output = ffmpeg.StandardOutput.BaseStream
-                Await output.CopyToAsync(transmit)
-                Await transmit.FlushAsync()
+                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in channel {channel.Id}.")
+
+                Try
+                    Dim output = ffmpeg.StandardOutput.BaseStream
+                    Await output.CopyToAsync(transmit)
+                    Await transmit.FlushAsync()
+                Catch ex As Exception
+                    _logger.Print(LogLevel.Warning, "Sentence Service", $"Speaking failed in {channel.Guild.Id}.", ex)
+                    Return False
+                End Try
             End Using
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Waiting for speaking to finish... ({channel.Id})")
@@ -119,6 +146,7 @@ Namespace Services
             voiceChn.Disconnect()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Finished speaking in channel {channel.Id}.")
+            Return True
         End Function
 
         Private Function CreateFfmpeg() As Process

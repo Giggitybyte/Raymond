@@ -6,7 +6,7 @@ Imports DSharpPlus.Entities
 Imports LiteDB
 Imports Raymond.Database
 Imports Raymond.Extensions
-Imports Raymond.Services
+Imports Raymond.Generators
 
 Namespace Commands.Modules
     <Group("generator"), Aliases("gen", "g")>
@@ -17,17 +17,18 @@ Namespace Commands.Modules
         Inherits BaseCommandModule
 
         Private _db As LiteDatabase
-        Private _sentence As SentenceService
+        Private _generators As List(Of IGenerator)
 
-        Public Sub New(db As LiteDatabase, sentence As SentenceService)
+        Public Sub New(db As LiteDatabase, generators As IEnumerable(Of IGenerator))
             _db = db
-            _sentence = sentence
+            _generators = generators.ToList
         End Sub
 
         <Command("set")>
         <Description("Sets the generator for your server.")>
         Public Async Function SetCommand(ctx As CommandContext, generator As String) As Task
-            If Not _sentence.Generators.Any(Function(g) g.Name = generator.ToLower) Then
+            generator = generator.ToLower
+            If Not (_generators.Any(Function(g) g.Name = generator) Or generator = "random") Then
                 Await ctx.RespondAsync("Invalid generator.")
                 Return
             End If
@@ -35,7 +36,7 @@ Namespace Commands.Modules
             Dim collection = _db.GetCollection(Of GuildData)
             Dim data = collection.GetGuildData(ctx.Guild.Id)
 
-            data.Generator = generator.ToLower
+            data.Generator = generator
             collection.Update(data)
 
             Await ctx.Message.CreateReactionAsync(DiscordEmoji.FromName(ctx.Client, ":ok_hand:"))
@@ -47,7 +48,7 @@ Namespace Commands.Modules
             Dim strBuilder As New StringBuilder
             strBuilder.AppendLine("Available Generators:").AppendLine()
 
-            For Each generator In _sentence.Generators
+            For Each generator In _generators
                 strBuilder.AppendLine(generator.Name)
             Next
 
