@@ -1,11 +1,10 @@
 ﻿Imports System.IO
 Imports System.Text
 Imports Newtonsoft.Json
-Imports Raymond.Services
 
-Namespace Generators
-    Public Class TechnologyPhraseGenerator
-        Implements IPhraseGenerator
+Namespace Generators.Buzzwords
+    Public Class TechnologyBuzzwords
+        Implements IBuzzwords
 
         Private _adjectives, _nouns, _verbs As List(Of String)
 
@@ -23,22 +22,22 @@ Namespace Generators
             _verbs = words("verbs")
         End Sub
 
-        Public ReadOnly Property Chance As Double Implements IPhraseGenerator.Chance
+        Public ReadOnly Property Chance As Double Implements IBuzzwords.Chance
             Get
                 Return 0.8
             End Get
         End Property
 
-        Public ReadOnly Property TtsVoice As String Implements IPhraseGenerator.TtsVoice
+        Public ReadOnly Property TtsVoice As String Implements IBuzzwords.TtsVoice
             Get
                 Return "en-IN-Wavenet-C"
             End Get
         End Property
 
-        Public Function GeneratePhrase(numberGenerator As NumberService) As String Implements IPhraseGenerator.GeneratePhrase
-            Dim verb = _verbs(numberGenerator.RandomNumber(_verbs.Count))
-            Dim adjective = _adjectives(numberGenerator.RandomNumber(_adjectives.Count))
-            Dim noun = _nouns(numberGenerator.RandomNumber(_nouns.Count))
+        Public Function GenerateSentence() As String Implements IBuzzwords.GenerateSentence
+            Dim verb = _verbs(Random.NextNumber(_verbs.Count))
+            Dim adjective = _adjectives(Random.NextNumber(_adjectives.Count))
+            Dim noun = _nouns(Random.NextNumber(_nouns.Count))
 
             Return $"{verb} {adjective} {noun}"
         End Function

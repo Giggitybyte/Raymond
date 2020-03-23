@@ -98,6 +98,7 @@ Namespace Commands
         End Function
 
         Private Function GetCommandUsage(cmd As Command) As String
+            If Not cmd.Overloads.Any Then Return Nothing
             Dim usageBuilder As New StringBuilder
 
             For Each overload In cmd.Overloads.OrderBy(Function(x) x.Priority)

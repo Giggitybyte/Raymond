@@ -6,12 +6,14 @@ Imports DSharpPlus.CommandsNext
 Imports DSharpPlus.CommandsNext.Attributes
 Imports DSharpPlus.CommandsNext.Exceptions
 Imports DSharpPlus.Entities
+Imports DSharpPlus.Interactivity
 Imports DSharpPlus.VoiceNext
 Imports LiteDB
 Imports Microsoft.Extensions.DependencyInjection
 Imports Newtonsoft.Json
 Imports Raymond.Commands
 Imports Raymond.Database
+Imports Raymond.Generators
 Imports Raymond.Services
 
 ''' <summary>
@@ -19,6 +21,7 @@ Imports Raymond.Services
 ''' </summary>
 Module Raymond
     Private _services As IServiceProvider
+    Public ReadOnly Property Random As New ThreadSafeRandom
 
     ''' <summary>
     ''' Program entry point.
@@ -38,39 +41,47 @@ Module Raymond
         Dim discord As New DiscordClient(New DiscordConfiguration With {
             .LogLevel = LogLevel.Debug,
             .Token = config("token.discord.pub"),
-            .TokenType = TokenType.Bot
+            .TokenType = TokenType.Bot,
+            .MessageCacheSize = 20480
         })
 
         discord.UseVoiceNext()
+        discord.UseInteractivity(New InteractivityConfiguration)
 
         AddHandler discord.ClientErrored, Function(e) logger.PrintAsync(LogLevel.Error, e.EventName, "", e.Exception)
         AddHandler discord.DebugLogger.LogMessageReceived, Function(s, e) logger.PrintAsync(e.Level, e.Application, e.Message, e.Exception)
 
         ' Services setup.
         Dim db As New LiteDatabase("Raymond.db")
-        db.GetCollection(Of GuildData)("guilds").EnsureIndex(Function(b) b.GuildId)
+        db.GetCollection(Of GuildData).EnsureIndex(Function(g) g.GuildId)
 
         With New ServiceCollection
             .AddSingleton(db)
             .AddSingleton(discord)
             .AddSingleton(logger)
-            .AddSingleton(Of NumberService)
             .AddSingleton(Of GoogleTtsService)
-            .AddSingleton(Of PhraseService)
+            .AddSingleton(Of SentenceService)
+
+            Dim interfaceType = GetType(IGenerator)
+
+            Dim types = interfaceType.Assembly.GetTypes.Where(Function(t) t IsNot interfaceType)
+            Dim genTypes = types.Where(Function(t) interfaceType.IsAssignableFrom(t)).ToList
+            genTypes.ForEach(Sub(t) .AddScoped(interfaceType, t))
+
             _services = .BuildServiceProvider
         End With
 
-        _services.GetRequiredService(Of PhraseService)
+        _services.GetRequiredService(Of SentenceService)
 
         ' Commands setup.
         Dim cmds = discord.UseCommandsNext(New CommandsNextConfiguration With {
             .EnableDms = False,
             .IgnoreExtraArguments = True,
-            .Services = _services
+            .Services = _services,
+            .StringPrefixes = {"r!"}
         })
 
         cmds.RegisterCommands(Assembly.GetExecutingAssembly)
-        cmds.RegisterConverter(New RaymondModeConverter)
         cmds.SetHelpFormatter(Of HelpFormatter)()
 
         AddHandler cmds.CommandErrored, AddressOf CommandErroredHandler
@@ -84,7 +95,12 @@ Module Raymond
     ''' Prints command errors to log, then informs the user that the command errored.
     ''' </summary>
     Private Async Function CommandErroredHandler(e As CommandErrorEventArgs) As Task
-        Dim msg = $"{e.Command.QualifiedName} errored in {e.Context.Guild.Id}"
+        If e.Command Is Nothing _
+           Or TypeOf e.Exception Is CommandNotFoundException _
+           Or e.Exception.Message = "Could not find a suitable overload for the command." _
+           Then Return
+
+        Dim msg = $"{e.Command.QualifiedName} errored in {e.Context.Guild.Id} ({e.Exception.GetType.Name})"
         Await _services.GetRequiredService(Of LogService).PrintAsync(LogLevel.Error, "CNext", msg, e.Exception)
 
         If Not TypeOf e.Exception Is ChecksFailedException Then

@@ -19,10 +19,10 @@ Namespace Services
                                   .ToList
         End Sub
 
-        Public Async Function SynthesizeAsync(phrase As String, Optional voice As String = Nothing) As Task(Of ByteString)
+        Public Async Function SynthesizeAsync(sentence As String, Optional voice As String = Nothing) As Task(Of ByteString)
             If voice Is Nothing Then voice = "en-US-Wavenet-D"
-            If Not _validVoices.Contains(voice) Then Throw New ArgumentException("Invalid TTS voice.")
-            Await _logger.PrintAsync(LogLevel.Info, "Google TTS", $"Synthesizing phrase: {phrase}")
+            If Not _validVoices.Contains(voice) Then Throw New ArgumentException($"{voice} is an invalid TTS voice.")
+            Await _logger.PrintAsync(LogLevel.Info, "Google TTS", $"Synthesizing sentence: {sentence}")
 
             Dim config As New AudioConfig With {
                 .AudioEncoding = AudioEncoding.Mp3
@@ -35,7 +35,7 @@ Namespace Services
             }
 
             Dim input As New SynthesisInput With {
-                .Text = phrase
+                .Text = sentence
             }
 
             Dim response = Await _client.SynthesizeSpeechAsync(New SynthesizeSpeechRequest With {

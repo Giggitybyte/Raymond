@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <NoWarn />
+    <NoWarn></NoWarn>
     <WarningsAsErrors>41999,42016,42017,42018,42019,42020,42021,42022,42032,42036</WarningsAsErrors>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <NoWarn />
+    <NoWarn></NoWarn>
     <WarningsAsErrors>41999,42016,42017,42018,42019,42020,42021,42022,42032,42036</WarningsAsErrors>
   </PropertyGroup>
 
@@ -23,9 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DSharpPlus" Version="4.0.0-nightly-00669" />
-    <PackageReference Include="DSharpPlus.CommandsNext" Version="4.0.0-nightly-00669" />
-    <PackageReference Include="DSharpPlus.VoiceNext" Version="4.0.0-nightly-00669" />
+    <PackageReference Include="DSharpPlus" Version="4.0.0-nightly-00670" />
+    <PackageReference Include="DSharpPlus.CommandsNext" Version="4.0.0-nightly-00670" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="4.0.0-nightly-00670" />
+    <PackageReference Include="DSharpPlus.VoiceNext" Version="4.0.0-nightly-00670" />
     <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="2.0.0" />
     <PackageReference Include="LiteDB" Version="5.0.4" />
     <PackageReference Include="MarkovNextGen" Version="1.2.6" />
@@ -46,9 +47,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Words\newage.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Words\rare.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Words\technology.json">

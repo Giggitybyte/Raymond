@@ -1,11 +1,10 @@
 ﻿Imports System.IO
 Imports System.Text
 Imports Newtonsoft.Json
-Imports Raymond.Services
 
-Namespace Generators
-    Public Class NewAgePhraseGenerator
-        Implements IPhraseGenerator
+Namespace Generators.Buzzwords
+    Public Class NewAgeBuzzwords
+        Implements IBuzzwords
 
         Private _prefixes, _adjectives, _buzzwords, _products, _beginningHalves, _endHalves As List(Of String)
 
@@ -27,38 +26,38 @@ Namespace Generators
             _endHalves = words("endhalves")
         End Sub
 
-        Public ReadOnly Property Chance As Double Implements IPhraseGenerator.Chance
+        Public ReadOnly Property Chance As Double Implements IBuzzwords.Chance
             Get
                 Return 0.75
             End Get
         End Property
 
-        Public ReadOnly Property TtsVoice As String Implements IPhraseGenerator.TtsVoice
+        Public ReadOnly Property TtsVoice As String Implements IBuzzwords.TtsVoice
             Get
                 Return "en-US-Wavenet-A"
             End Get
         End Property
 
-        Public Function GeneratePhrase(numberGenerator As NumberService) As String Implements IPhraseGenerator.GeneratePhrase
-            If numberGenerator.ProbabilityCheck(0.3) Then
-                Dim firstHalf = _beginningHalves(numberGenerator.RandomNumber(_beginningHalves.Count))
-                Dim secondHalf = _endHalves(numberGenerator.RandomNumber(_endHalves.Count))
+        Public Function GenerateSentence() As String Implements IBuzzwords.GenerateSentence
+            If Random.ProbabilityCheck(0.3) Then
+                Dim firstHalf = _beginningHalves(Random.NextNumber(_beginningHalves.Count))
+                Dim secondHalf = _endHalves(Random.NextNumber(_endHalves.Count))
                 Return $"{firstHalf} {secondHalf}"
             End If
 
             With New StringBuilder
-                If numberGenerator.ProbabilityCheck(0.4) Then
-                    .Append(_prefixes(numberGenerator.RandomNumber(_prefixes.Count)))
+                If Random.ProbabilityCheck(0.4) Then
+                    .Append(_prefixes(Random.NextNumber(_prefixes.Count)))
                 End If
 
-                .Append($"{_adjectives(numberGenerator.RandomNumber(_adjectives.Count))} ")
+                .Append($"{_adjectives(Random.NextNumber(_adjectives.Count))} ")
 
-                If numberGenerator.ProbabilityCheck(0.25) Then
-                    .Append($"{_adjectives(numberGenerator.RandomNumber(_adjectives.Count))} ")
+                If Random.ProbabilityCheck(0.25) Then
+                    .Append($"{_adjectives(Random.NextNumber(_adjectives.Count))} ")
                 End If
 
-                .Append($"{_buzzwords(numberGenerator.RandomNumber(_buzzwords.Count))} ")
-                .Append(_products(numberGenerator.RandomNumber(_products.Count)))
+                .Append($"{_buzzwords(Random.NextNumber(_buzzwords.Count))} ")
+                .Append(_products(Random.NextNumber(_products.Count)))
 
                 Return .ToString
             End With

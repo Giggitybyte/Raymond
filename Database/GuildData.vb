@@ -11,18 +11,13 @@
         Public Property GuildId As ULong
 
         ''' <summary>
-        ''' Collection of Discord voice channel IDs that Raymond is not permitted to join.
+        ''' Collection of Discord channel IDs that Raymond is not permitted interact with.
         ''' </summary>
-        Public Property ProhibitedVoiceIds As New List(Of ULong)
-
-        ''' <summary>
-        ''' Collection of Discord text channel IDs that Raymond is not allowed to generate Markov chains from.
-        ''' </summary>
-        Public Property ProhibitedTextIds As New List(Of ULong)
+        Public Property ProhibitedChannelIds As New List(Of ULong)
 
         ''' <summary>
         ''' Determines what sort of things Raymond will say when he enters a voice channel.
         ''' </summary>
-        Public Property Mode As RaymondMode
+        Public Property Generator As String
     End Class
 End Namespace

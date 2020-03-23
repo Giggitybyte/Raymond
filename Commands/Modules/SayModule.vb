@@ -7,10 +7,10 @@ Namespace Commands.Modules
     Public Class SayModule
         Inherits BaseCommandModule
 
-        Private _phrase As PhraseService
+        Private _sentence As SentenceService
 
-        Public Sub New(phrase As PhraseService)
-            _phrase = phrase
+        Public Sub New(sentence As SentenceService)
+            _sentence = sentence
         End Sub
 
         <Command("say"), Aliases("speak", "echo")>
@@ -28,7 +28,7 @@ Namespace Commands.Modules
                 Return
             End If
 
-            Await _phrase.SendPhraseAsync(text, ctx.Member.VoiceState.Channel, "en-US-Standard-B")
+            Await _sentence.SendSentenceAsync(ctx.Member.VoiceState.Channel, text, "en-US-Standard-B")
         End Function
     End Class
 End Namespace
