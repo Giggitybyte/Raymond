@@ -113,50 +113,31 @@ Namespace Services
         ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
         ''' </summary>
         Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task(Of Boolean)
+            Dim guild = channel.Guild
             Dim speech = Await _tts.SynthesizeAsync(text, voice)
-            Dim voiceChn As VoiceNextConnection
-            Dim transmit As VoiceTransmitStream
+            Dim voiceChn = Await channel.ConnectAsync()
+            Dim transmit = voiceChn.GetTransmitStream()
 
-            Using ffmpeg = CreateFfmpeg()
-                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Processing synthesized speech for {channel.Guild.Id}.")
+            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in guild {guild.Id}")
 
-                Dim input = ffmpeg.StandardInput.BaseStream
-                speech.WriteTo(input)
-                Await input.DisposeAsync
+            Try
+                Await speech.CopyToAsync(transmit)
+                Await transmit.FlushAsync()
+            Catch ex As Exception
+                _logger.Print(LogLevel.Warning, "Sentence Service", $"Speaking failed in guild {guild.Id}.", ex)
+                speech.Dispose()
+                Return False
+            End Try
 
-                voiceChn = Await channel.ConnectAsync()
-                transmit = voiceChn.GetTransmitStream()
-
-                Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in channel {channel.Id}.")
-
-                Try
-                    Dim output = ffmpeg.StandardOutput.BaseStream
-                    Await output.CopyToAsync(transmit)
-                    Await transmit.FlushAsync()
-                Catch ex As Exception
-                    _logger.Print(LogLevel.Warning, "Sentence Service", $"Speaking failed in {channel.Guild.Id}.", ex)
-                    Return False
-                End Try
-            End Using
-
-            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Waiting for speaking to finish... ({channel.Id})")
+            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Waiting for speaking to finish... ({guild.Id})")
             Await voiceChn.WaitForPlaybackFinishAsync
 
+            Await speech.DisposeAsync
             Await transmit.DisposeAsync
             voiceChn.Disconnect()
 
-            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Finished speaking in channel {channel.Id}.")
+            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Finished speaking in guild {guild.Id}.")
             Return True
-        End Function
-
-        Private Function CreateFfmpeg() As Process
-            Return Process.Start(New ProcessStartInfo With {
-                .FileName = "ffmpeg",
-                .Arguments = $"-hide_banner -loglevel panic -i pipe:0 -ac 2 -f s16le -ar 48000 pipe:1",
-                .UseShellExecute = False,
-                .RedirectStandardOutput = True,
-                .RedirectStandardInput = True
-            })
         End Function
     End Class
 End Namespace

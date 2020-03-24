@@ -1,6 +1,8 @@
-﻿Imports DSharpPlus
+﻿Imports System.IO
+Imports DSharpPlus
 Imports Google.Cloud.TextToSpeech.V1
 Imports Google.Protobuf
+Imports NAudio.Wave
 
 Namespace Services
     Public Class GoogleTtsService
@@ -19,13 +21,14 @@ Namespace Services
                                   .ToList
         End Sub
 
-        Public Async Function SynthesizeAsync(sentence As String, Optional voice As String = Nothing) As Task(Of ByteString)
+        Public Async Function SynthesizeAsync(sentence As String, Optional voice As String = Nothing) As Task(Of Stream)
             If voice Is Nothing Then voice = "en-US-Wavenet-D"
             If Not _validVoices.Contains(voice) Then Throw New ArgumentException($"{voice} is an invalid TTS voice.")
             Await _logger.PrintAsync(LogLevel.Info, "Google TTS", $"Synthesizing sentence: {sentence}")
 
             Dim config As New AudioConfig With {
-                .AudioEncoding = AudioEncoding.Mp3
+                .AudioEncoding = AudioEncoding.Linear16,
+                .SampleRateHertz = 96000
             }
 
             Dim voiceParams As New VoiceSelectionParams With {
@@ -44,7 +47,8 @@ Namespace Services
                 .Voice = voiceParams
             })
 
-            Return response.AudioContent
+            Dim audioData = response.AudioContent.Skip(44).ToArray
+            Return New MemoryStream(audioData)
         End Function
     End Class
 End Namespace

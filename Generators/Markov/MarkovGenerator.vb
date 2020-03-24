@@ -40,7 +40,7 @@ Namespace Generators.MarkovChain
             Dim length = Random.NextNumber(15, 20)
             Return New GeneratorResult With {
                 .Sentence = _markovs(guild.Id).Generate(length) + ".",
-                .TtsVoice = "en-AU-Wavenet-B"
+                .TtsVoice = "en-US-Wavenet-B"
             }
         End Function
 
