@@ -1,8 +1,7 @@
 ﻿Imports System.Runtime.CompilerServices
 Imports LiteDB
-Imports Raymond.Database
 
-Namespace Extensions
+Namespace Database
     Public Module DatabaseExtensions
         ''' <summary>
         ''' Retrieves a <see cref="GuildData"/> object from the database.
@@ -15,7 +14,7 @@ Namespace Extensions
             If data Is Nothing Then
                 data = New GuildData With {
                     .GuildId = guildId,
-                    .Generator = "buzzword"
+                    .Generator = "random"
                 }
 
                 data.Id = collection.Insert(data)

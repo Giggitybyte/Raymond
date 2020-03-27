@@ -1,8 +1,6 @@
 ﻿Imports System.IO
 Imports DSharpPlus
 Imports Google.Cloud.TextToSpeech.V1
-Imports Google.Protobuf
-Imports NAudio.Wave
 
 Namespace Services
     Public Class GoogleTtsService
@@ -47,7 +45,7 @@ Namespace Services
                 .Voice = voiceParams
             })
 
-            Dim audioData = response.AudioContent.Skip(44).ToArray
+            Dim audioData = response.AudioContent.Skip(46).ToArray
             Return New MemoryStream(audioData)
         End Function
     End Class

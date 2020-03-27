@@ -5,13 +5,12 @@ Imports DSharpPlus.CommandsNext.Attributes
 Imports DSharpPlus.Entities
 Imports LiteDB
 Imports Raymond.Database
-Imports Raymond.Extensions
 Imports Raymond.Generators
 
 Namespace Commands.Modules
     <Group("generator"), Aliases("gen", "g")>
-    <Description("The 'set' sub command will allow you to change which generator will be used for your server, " + vbCrLf +
-                 "while the 'list' sub command will display all available generators for you to choose from.")>
+    <Description("The 'set' subcommand will allow you to change which generator will be used for your server, " + vbCrLf +
+                 "while the 'list' subcommand will display all available generators for you to choose from.")>
     <RequireUserPermissions(Permissions.ManageGuild)>
     Public Class GeneratorModule
         Inherits BaseCommandModule

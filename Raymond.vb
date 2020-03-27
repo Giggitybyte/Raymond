@@ -42,7 +42,7 @@ Module Raymond
             .LogLevel = LogLevel.Debug,
             .Token = config("token.discord.pub"),
             .TokenType = TokenType.Bot,
-            .MessageCacheSize = 20480
+            .MessageCacheSize = 2048
         })
 
         discord.UseVoiceNext()

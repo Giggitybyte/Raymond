@@ -1,12 +1,10 @@
-﻿Imports System.IO
-Imports System.Threading
+﻿Imports System.Threading
 Imports DSharpPlus
 Imports DSharpPlus.Entities
 Imports DSharpPlus.EventArgs
 Imports DSharpPlus.VoiceNext
 Imports LiteDB
 Imports Raymond.Database
-Imports Raymond.Extensions
 Imports Raymond.Generators
 
 Namespace Services
@@ -71,27 +69,23 @@ Namespace Services
                                                            AndAlso c.Users.Any).ToList
             If validChannels.Any Then
                 Dim channel = validChannels.OrderByDescending(Function(c) c.Users.Count).First
-                Dim success As Boolean
-
-                Do ' vnext occasionally throws, so we'll retry until it doesn't fucking throw.
-                    success = Await SendSentenceAsync(channel)
-                Loop Until success
+                Await SendSentenceAsync(channel)
             Else
                 Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Skipping guild {guild.Id}.")
             End If
 
-            ' Set timer to fire again anywhere between 2 and 5 days.
-            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(172800000, 432000000))
+            ' Set timer to fire again anywhere between 3 and 6 days.
+            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(259200000, 518400000))
             _timers(guild.Id).Change(time, Timeout.InfiniteTimeSpan)
 
-            Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for guild {guild.Id}: {Date.Now.Add(time).ToString}")
+            Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for guild {guild.Id}: {Date.Now.Add(time)}")
         End Sub
 
         ''' <summary>
         ''' Selects a generator based on user preference then sends the guild a sentence.
         ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
         ''' </summary>
-        Private Async Function SendSentenceAsync(channel As DiscordChannel) As Task(Of Boolean)
+        Private Async Function SendSentenceAsync(channel As DiscordChannel) As Task
             ' Get generator
             Dim collection = _database.GetCollection(Of GuildData)
             Dim data = collection.GetGuildData(channel.Guild.Id)
@@ -105,39 +99,44 @@ Namespace Services
 
             ' Send sentence.
             Dim result = generator.CreateSentence(channel.Guild)
-            Return Await SendSentenceAsync(channel, result.Sentence, result.TtsVoice)
+            Await SendSentenceAsync(channel, result.Sentence, result.TtsVoice)
         End Function
 
         ''' <summary>
         ''' Joins the specified voice channel and says the provided text.
         ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
         ''' </summary>
-        Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task(Of Boolean)
+        Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task
             Dim guild = channel.Guild
             Dim speech = Await _tts.SynthesizeAsync(text, voice)
-            Dim voiceChn = Await channel.ConnectAsync()
-            Dim transmit = voiceChn.GetTransmitStream()
+            Dim voiceConn = Await channel.ConnectAsync()
+            Dim transmit = voiceConn.GetTransmitStream()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in guild {guild.Id}")
 
-            Try
-                Await speech.CopyToAsync(transmit)
-                Await transmit.FlushAsync()
-            Catch ex As Exception
-                _logger.Print(LogLevel.Warning, "Sentence Service", $"Speaking failed in guild {guild.Id}.", ex)
-                speech.Dispose()
-                Return False
-            End Try
+            Dim pcmBuffer(3839) As Byte
+            Dim byteCount = 1
 
-            Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Waiting for speaking to finish... ({guild.Id})")
-            Await voiceChn.WaitForPlaybackFinishAsync
+            While byteCount > 0
+                byteCount = Await speech.ReadAsync(pcmBuffer, 0, pcmBuffer.Length)
+                If byteCount = 0 Then Exit While
+
+                If byteCount < pcmBuffer.Length Then
+                    For i = byteCount To pcmBuffer.Length - 1
+                        pcmBuffer(i) = 0
+                    Next
+                End If
+
+                Await transmit.WriteAsync(pcmBuffer, 0, pcmBuffer.Length)
+            End While
+
+            Await voiceConn.WaitForPlaybackFinishAsync
 
             Await speech.DisposeAsync
             Await transmit.DisposeAsync
-            voiceChn.Disconnect()
+            voiceConn.Disconnect()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Finished speaking in guild {guild.Id}.")
-            Return True
         End Function
     End Class
 End Namespace

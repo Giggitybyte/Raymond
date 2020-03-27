@@ -7,7 +7,6 @@ Imports DSharpPlus.Entities.DiscordEmbedBuilder
 Imports DSharpPlus.Interactivity
 Imports LiteDB
 Imports Raymond.Database
-Imports Raymond.Extensions
 
 Namespace Commands.Modules
     <Group("blacklist")>

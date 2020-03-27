@@ -6,7 +6,6 @@ Imports DSharpPlus.EventArgs
 Imports LiteDB
 Imports MarkovNextGen
 Imports Raymond.Database
-Imports Raymond.Extensions
 
 Namespace Generators.MarkovChain
     ''' <summary>
@@ -17,8 +16,10 @@ Namespace Generators.MarkovChain
 
         Private _db As LiteDatabase
         Private _markovs As Dictionary(Of ULong, Markov)
-        Private _discordRegex As New Regex("<(?:[^\d>]+|:[A-Za-z0-9]+:)\w+>", RegexOptions.Compiled)
+
         Private _puncuationRegex As New Regex("\w(?:[\w'-]*\w)?", RegexOptions.Compiled)
+        Private _discordRegex As New Regex("<(?:[^\d>]+|:[A-Za-z0-9]+:)\w+>", RegexOptions.Compiled)
+        Private _urlRegex As New Regex("((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-]*)?\??(?:[\-\+=&;%@\.\w]*)#?(?:[\.\!\/\\\w]*))?)", RegexOptions.Compiled)
 
         Public Sub New(discord As DiscordClient, database As LiteDatabase)
             Directory.CreateDirectory("Markov")
@@ -64,11 +65,7 @@ Namespace Generators.MarkovChain
         ''' Adds the content of a message to its guild markov generator.
         ''' </summary>
         Private Function MessageCreatedHandler(e As MessageCreateEventArgs) As Task
-            Dim data = _db.GetCollection(Of GuildData).GetGuildData(e.Guild.Id)
-            If Not (e.Message.Author.IsBot Or data.ProhibitedChannelIds.Contains(e.Channel.Id)) Then
-                _markovs(e.Guild.Id).AddToChain(_discordRegex.Replace(e.Message.Content, ""))
-            End If
-
+            TrainMarkov(e.Guild, e.Message)
             Return Task.CompletedTask
         End Function
 
@@ -83,17 +80,44 @@ Namespace Generators.MarkovChain
             Dim textChannels = channels.Where(Function(c) c.Type = ChannelType.Text _
                                                           AndAlso Not data.ProhibitedChannelIds.Contains(c.Id))
             For Each channel In textChannels
-                Dim messages = Await channel.GetMessagesAsync(50)
+                Dim messages = Await channel.GetMessagesAsync(20)
                 Dim userMessages = messages.Where(Function(m) Not m.Author.IsBot)
 
                 For Each message In userMessages
-                    Dim text = _discordRegex.Replace(message.Content, "")
-                    text = String.Join(" ", _puncuationRegex.Matches(text))
-                    markov.AddToChain(text)
+                    markov.AddToChain(FilterText(message.Content))
                 Next
             Next
 
-            _markovs.Add(guild.Id, markov)
+            _markovs(guild.Id) = markov
+        End Function
+
+        ''' <summary>
+        ''' Filters message content then adds it to the markov chain of the provided guild.
+        ''' </summary>
+        Public Sub TrainMarkov(guild As DiscordGuild, message As DiscordMessage)
+            Dim data = _db.GetCollection(Of GuildData).GetGuildData(guild.Id)
+            If Not (data.ProhibitedChannelIds.Contains(message.Channel.Id) Or message.Author.IsBot) Then
+                _markovs(guild.Id).AddToChain(FilterText(message.Content))
+            End If
+        End Sub
+
+        ''' <summary>
+        ''' Deletes the markov chain for a guild then reinitalizes it.
+        ''' </summary>
+        Public Async Function ReinitializeMarkovAsync(guild As DiscordGuild) As Task
+            File.Delete($"Markov/{guild.Id}.pdo")
+            Await InitializeMarkov(guild)
+        End Function
+
+        ''' <summary>
+        ''' Uses regex to remove discord mentions, urls, and stray punctuation.
+        ''' </summary>
+        Private Function FilterText(text As String) As String
+            text = _discordRegex.Replace(text, "")
+            text = _urlRegex.Replace(text, "")
+            text = String.Join(" ", _puncuationRegex.Matches(text))
+
+            Return text.Trim
         End Function
     End Class
 End Namespace
