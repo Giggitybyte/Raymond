@@ -34,8 +34,6 @@ Module Raymond
     ''' Bot entry point.
     ''' </summary>
     Private Async Function MainAsync() As Task
-        Directory.CreateDirectory("Raymond")
-
         Dim config = GetRaymondConfig()
         Dim logger As New LogService
 
@@ -54,7 +52,7 @@ Module Raymond
         AddHandler discord.DebugLogger.LogMessageReceived, Function(s, e) logger.PrintAsync(e.Level, e.Application, e.Message, e.Exception)
 
         ' Services setup.
-        Dim db As New LiteDatabase("Raymond/Raymond.db")
+        Dim db As New LiteDatabase("Raymond.db")
         db.GetCollection(Of GuildData).EnsureIndex(Function(g) g.GuildId)
 
         With New ServiceCollection
