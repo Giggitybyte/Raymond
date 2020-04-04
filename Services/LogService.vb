@@ -13,7 +13,7 @@ Namespace Services
             Dim logFormat = "[{Timestamp:MMM dd yyyy hh:mm:ss tt}] [{Level:u3}] [{Source}] {Message:lj}{NewLine}{Exception}"
             Log.Logger = New LoggerConfiguration() _
                 .MinimumLevel.Verbose _
-                .WriteTo.File("raymond-.log", outputTemplate:=logFormat, rollingInterval:=RollingInterval.Day) _
+                .WriteTo.File("Raymond/raymond-.log", outputTemplate:=logFormat, rollingInterval:=RollingInterval.Day) _
                 .WriteTo.Console(LogEventLevel.Information, outputTemplate:=logFormat, theme:=SystemConsoleTheme.Colored) _
                 .Enrich.FromLogContext _
                 .CreateLogger
