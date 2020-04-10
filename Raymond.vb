@@ -48,7 +48,6 @@ Module Raymond
         discord.UseVoiceNext()
         discord.UseInteractivity(New InteractivityConfiguration)
 
-        AddHandler discord.ClientErrored, Function(e) logger.PrintAsync(LogLevel.Error, e.EventName, "", e.Exception)
         AddHandler discord.DebugLogger.LogMessageReceived, Function(s, e) logger.PrintAsync(e.Level, e.Application, e.Message, e.Exception)
 
         ' Services setup.

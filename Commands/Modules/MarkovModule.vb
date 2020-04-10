@@ -42,8 +42,13 @@ Namespace Commands.Modules
         <Command("reset")>
         <Description("Deletes the markov chain for this server then reinitializes it using 20 messages from each non-blacklisted text channel.")>
         Public Async Function ResetCommand(ctx As CommandContext) As Task
+            Dim loading = DiscordEmoji.FromGuildEmote(ctx.Client, 534230967574069249)
+            Dim okay = DiscordEmoji.FromName(ctx.Client, ":ok_hand:")
+
+            Await ctx.Message.CreateReactionAsync(loading)
             Await _generator.ReinitializeMarkovAsync(ctx.Guild)
-            Await ctx.Message.CreateReactionAsync(DiscordEmoji.FromName(ctx.Client, ":ok_hand:"))
+            Await ctx.Message.CreateReactionAsync(okay)
+            Await ctx.Message.DeleteOwnReactionAsync(loading)
         End Function
 
         <Command("generate")>

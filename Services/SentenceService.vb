@@ -37,7 +37,7 @@ Namespace Services
         Private Async Function GuildAvailableHandler(e As GuildCreateEventArgs) As Task
             If _timers.ContainsKey(e.Guild.Id) Then Return
 
-            _timers.Add(e.Guild.Id, New Timer(AddressOf GuildTrigger, e.Guild.Id, 5000, -1)) ' In prod, change to 2 days.
+            _timers.Add(e.Guild.Id, New Timer(AddressOf GuildTrigger, e.Guild.Id, 5000, -1)) ' On release, change to 2 days.
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Added a new timer for guild {e.Guild.Id}")
         End Function
 
@@ -74,8 +74,8 @@ Namespace Services
                 Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Skipping guild {guild.Id}.")
             End If
 
-            ' Set timer to fire again anywhere between 3 and 6 days.
-            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(259200000, 518400000))
+            ' Set timer to fire again anywhere between 2 and 6 days.
+            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(172800000, 518400000))
             _timers(guild.Id).Change(time, Timeout.InfiniteTimeSpan)
 
             Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for guild {guild.Id}: {Date.Now.Add(time)}")
@@ -83,7 +83,6 @@ Namespace Services
 
         ''' <summary>
         ''' Selects a generator based on user preference then sends the guild a sentence.
-        ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
         ''' </summary>
         Private Async Function SendSentenceAsync(channel As DiscordChannel) As Task
             ' Get generator
@@ -104,7 +103,6 @@ Namespace Services
 
         ''' <summary>
         ''' Joins the specified voice channel and says the provided text.
-        ''' Returns <see langword="False"/> if something went wrong as an indication to try again.
         ''' </summary>
         Public Async Function SendSentenceAsync(channel As DiscordChannel, text As String, voice As String) As Task
             Dim guild = channel.Guild
@@ -114,27 +112,31 @@ Namespace Services
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Speaking in guild {guild.Id}")
 
-            Dim pcmBuffer(3839) As Byte
-            Dim byteCount = 1
+            Try
+                Dim pcmBuffer(3839) As Byte
+                Dim byteCount = 1
 
-            While byteCount > 0
-                byteCount = Await speech.ReadAsync(pcmBuffer, 0, pcmBuffer.Length)
-                If byteCount = 0 Then Exit While
+                While byteCount > 0
+                    byteCount = Await speech.ReadAsync(pcmBuffer, 0, pcmBuffer.Length)
+                    If byteCount = 0 Then Exit While
 
-                If byteCount < pcmBuffer.Length Then
-                    For i = byteCount To pcmBuffer.Length - 1
-                        pcmBuffer(i) = 0
-                    Next
-                End If
+                    If byteCount < pcmBuffer.Length Then
+                        For i = byteCount To pcmBuffer.Length - 1
+                            pcmBuffer(i) = 0
+                        Next
+                    End If
 
-                Await transmit.WriteAsync(pcmBuffer, 0, pcmBuffer.Length)
-            End While
+                    Await transmit.WriteAsync(pcmBuffer, 0, pcmBuffer.Length)
+                End While
+            Catch ex As Exception
+                _logger.Print(LogLevel.Warning, "Sentence Service", "An exception was thrown while sending a sentence.", ex)
+            End Try
 
+            transmit.Flush()
             Await voiceConn.WaitForPlaybackFinishAsync
 
             Await speech.DisposeAsync
-            Await transmit.DisposeAsync
-            voiceConn.Disconnect()
+            voiceConn.Dispose()
 
             Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Finished speaking in guild {guild.Id}.")
         End Function

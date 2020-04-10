@@ -8,19 +8,19 @@ Namespace Commands
     Public Class HelpFormatter
         Inherits BaseHelpFormatter
 
-        Private Property MsgBuilder As StringBuilder
-        Private Property DisplayAllCommands As Boolean
+        Private _msgBuilder As StringBuilder
+        Private _displayAllCommands As Boolean
 
         Public Sub New(ctx As CommandContext)
             MyBase.New(ctx)
-            _MsgBuilder = New StringBuilder
-            _DisplayAllCommands = True
+            _msgBuilder = New StringBuilder
+            _displayAllCommands = True
         End Sub
 
         Public Overrides Function WithCommand(cmd As Command) As BaseHelpFormatter
-            DisplayAllCommands = False
+            _displayAllCommands = False
 
-            With MsgBuilder
+            With _msgBuilder
                 ' Header
                 .AppendLine(cmd.QualifiedName)
                 .AppendLine(New String("-"c, cmd.QualifiedName.Count))
@@ -53,31 +53,31 @@ Namespace Commands
                     .AppendLine()
                     .AppendLine("usage::")
                     .Append(usages)
-                End If
 
-                MsgBuilder.AppendLine.AppendLine("// [arg] = required • (arg) = optional")
+                    _msgBuilder.AppendLine.AppendLine("// [arg] = required • (arg) = optional")
+                End If
             End With
 
             Return Me
         End Function
 
         Public Overrides Function WithSubcommands(commands As IEnumerable(Of Command)) As BaseHelpFormatter
-            If DisplayAllCommands Then
+            If _displayAllCommands Then
                 Dim cmds = commands.Where(Function(s) s.Name.ToLower <> "help")
                 Dim cmdNames = cmds.Select(Function(cmd) $"{cmd.Name}")
-                MsgBuilder.Append(String.Join($", ", cmdNames))
+                _msgBuilder.Append(String.Join($", ", cmdNames))
             End If
 
             Return Me
         End Function
 
         Public Overrides Function Build() As CommandHelpMessage
-            If Not DisplayAllCommands Then Return New CommandHelpMessage(Formatter.BlockCode(MsgBuilder.ToString, "asciidoc"))
+            If Not _displayAllCommands Then Return New CommandHelpMessage(Formatter.BlockCode(_msgBuilder.ToString, "asciidoc"))
 
             With New StringBuilder
                 .AppendLine("available commands")
                 .AppendLine(New String("-"c, 18))
-                .AppendLine(MsgBuilder.ToString)
+                .AppendLine(_msgBuilder.ToString)
                 .AppendLine()
                 .AppendLine("// specify a command to see its usage")
 

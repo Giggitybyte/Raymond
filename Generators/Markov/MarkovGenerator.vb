@@ -77,7 +77,8 @@ Namespace Generators.MarkovChain
             Dim markov As New Markov($"Markov/{guild.Id}.pdo")
 
             Dim channels = Await guild.GetChannelsAsync
-            Dim textChannels = channels.Where(Function(c) c.Type = ChannelType.Text _
+            Dim textChannels = channels.Where(Function(c) c.Type = ChannelType.Text AndAlso
+                                                          c.PermissionsFor(guild.CurrentMember).HasPermission(Permissions.AccessChannels) _
                                                           AndAlso Not data.ProhibitedChannelIds.Contains(c.Id))
             For Each channel In textChannels
                 Dim messages = Await channel.GetMessagesAsync(20)
