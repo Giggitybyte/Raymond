@@ -36,8 +36,6 @@ Namespace Generators.Buzzwords
         ''' Returns a randomly chosen sentence of buzzwords.
         ''' </summary>
         Public Function GenerateSentence() As String
-            Dim sw = Stopwatch.StartNew
-
             If Not _words?.Any Or Not _constructs?.Any Then
                 Throw New InvalidOperationException("This buzzword generator was not properly initialized.")
             End If
@@ -58,8 +56,6 @@ Namespace Generators.Buzzwords
                 Loop
             Next
 
-            sw.Stop()
-            Console.WriteLine($"Sentence generation took {sw.Elapsed}")
             Return sentence
         End Function
     End Class
