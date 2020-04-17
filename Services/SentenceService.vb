@@ -74,8 +74,8 @@ Namespace Services
                 Await _logger.PrintAsync(LogLevel.Debug, "Sentence Service", $"Skipping guild {guild.Id}.")
             End If
 
-            ' Set timer to fire again anywhere between 2 and 6 days.
-            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(172800000, 518400000))
+            ' Set timer to fire again anywhere between 2 and 5 days.
+            Dim time = TimeSpan.FromMilliseconds(Random.NextNumber(172800000, 432000000))
             _timers(guild.Id).Change(time, Timeout.InfiniteTimeSpan)
 
             Await _logger.PrintAsync(LogLevel.Info, "Sentence Service", $"Next appearance for guild {guild.Id}: {Date.Now.Add(time)}")

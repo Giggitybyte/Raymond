@@ -9,11 +9,11 @@ Namespace Generators.Buzzwords
         Public Sub New()
             _bag = New BuzzwordBag
 
-            Dim interfaceType = GetType(IBuzzwords)
-            Dim types = interfaceType.Assembly.GetTypes.Where(Function(t) t IsNot interfaceType _
-                                                                          AndAlso interfaceType.IsAssignableFrom(t)).ToList
-            Dim instances As New List(Of IBuzzwords)
-            types.ForEach(Sub(t) instances.Add(CType(Activator.CreateInstance(t), IBuzzwords)))
+            Dim baseType = GetType(BuzzwordBase)
+            Dim types = baseType.Assembly.GetTypes.Where(Function(t) t IsNot baseType _
+                                                                          AndAlso baseType.IsAssignableFrom(t)).ToList
+            Dim instances As New List(Of BuzzwordBase)
+            types.ForEach(Sub(t) instances.Add(CType(Activator.CreateInstance(t), BuzzwordBase)))
             instances.OrderBy(Function(i) i.Chance).ToList.ForEach(Sub(i) _bag.AddEntry(i))
         End Sub
 
@@ -35,7 +35,7 @@ Namespace Generators.Buzzwords
             Private _entries As New List(Of Entry)
             Private _accumulatedWeight As Double
 
-            Public Sub AddEntry(entry As IBuzzwords)
+            Public Sub AddEntry(entry As BuzzwordBase)
                 _accumulatedWeight += entry.Chance
                 _entries.Add(New Entry With {
                     .Buzzwords = entry,
@@ -43,7 +43,7 @@ Namespace Generators.Buzzwords
                 })
             End Sub
 
-            Public Function GetRandomEntry() As IBuzzwords
+            Public Function GetRandomEntry() As BuzzwordBase
                 Dim r As Double = Random.NextDouble * _accumulatedWeight
 
                 For Each entry As Entry In _entries
@@ -57,7 +57,7 @@ Namespace Generators.Buzzwords
 
             Private Structure Entry
                 Public Property AccumulatedWeight As Double
-                Public Property Buzzwords As IBuzzwords
+                Public Property Buzzwords As BuzzwordBase
             End Structure
         End Class
     End Class
